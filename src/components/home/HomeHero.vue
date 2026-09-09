@@ -1,15 +1,33 @@
 <script setup>
 import botellaSidra from '../../assets/images/home/hero/botella-sidra.jpeg'
+import goteoSidra from '../../assets/images/home/hero/goteo-sidra.jpeg'
+import vasoSidra from '../../assets/images/home/hero/vaso-sidra.jpeg'
 </script>
 
 <template>
   <section class="relative min-h-screen overflow-hidden">
-    <img
-      :src="botellaSidra"
-      alt="Botella de sidra"
-      class="absolute inset-0 h-full w-full object-cover"
-    />
+    <!-- Hero animacion -->
+    <div class="absolute inset-0">
+      <img
+        :src="botellaSidra"
+        alt="Botella de sidra"
+        class="absolute inset-0 h-full w-full object-cover opacity-50"
+      />
 
+      <img
+        :src="goteoSidra"
+        alt="Sidra cayendo desde una botella"
+        class="absolute inset-0 h-full w-full object-cover opacity-50"
+      />
+
+      <img
+        :src="vasoSidra"
+        alt="Vaso de sidra"
+        class="absolute inset-0 h-full w-full object-cover opacity-50"
+      />
+    </div>
+
+    <!-- Hero texto -->
     <div
       class="relative z-10 flex min-h-screen items-center justify-center px-6 text-center md:px-10 lg:px-16"
     >
