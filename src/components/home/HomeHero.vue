@@ -7,7 +7,7 @@ import vasoSidra from '../../assets/images/home/hero/vaso-sidra.jpeg'
 <template>
   <section class="relative h-[250vh] overflow-hidden md:h-[220vh] lg:h-[200vh]">
     <div class="sticky top-0 h-screen overflow-hidden">
-      <!-- Hero frames -->
+      <!-- Hero animacion -->
       <div class="absolute inset-0">
         <img
           :src="botellaSidra"
@@ -28,7 +28,7 @@ import vasoSidra from '../../assets/images/home/hero/vaso-sidra.jpeg'
         />
       </div>
 
-      <!-- Hero content -->
+      <!-- Hero texto -->
       <div
         class="relative z-10 flex h-full items-center justify-center px-6 text-center md:px-10 lg:px-16"
       >
