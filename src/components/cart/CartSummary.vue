@@ -16,7 +16,11 @@ defineProps({
   },
 });
 
-const emit = defineEmits(["update-order-type", "update-scheduled-order"]);
+const emit = defineEmits([
+  "update-order-type",
+  "update-scheduled-order",
+  "continue",
+]);
 </script>
 
 <template>
@@ -79,10 +83,10 @@ const emit = defineEmits(["update-order-type", "update-scheduled-order"]);
       </div>
     </div>
 
-    <!-- Continuar -->
     <button
       type="button"
       class="mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-[var(--color-primary)] px-5 py-4 font-ui text-sm font-semibold text-[var(--color-on-primary)] transition-transform hover:scale-[1.01]"
+      @click="emit('continue')"
     >
       Continuar pedido
       <span aria-hidden="true">→</span>

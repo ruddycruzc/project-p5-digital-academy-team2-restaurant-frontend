@@ -1,35 +1,51 @@
 <script setup>
-import { ref, computed } from 'vue'
-import { useRoute } from 'vue-router'
-import fabadaImg from '@/assets/images/menu/fabada.png'
-import trigoIcon from '@/assets/images/icon-alegernos/trigo.png'
-import lacteosIcon from '@/assets/images/icon-alegernos/productos-lacteos.png'
-import huevosIcon from '@/assets/images/icon-alegernos/huevos.png'
+import { ref, computed, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { useCart } from '@/composables/useCart'
 
+/*
+  route: para leer el id del producto de la URL (/product/:id).
+  router: para llevar al usuario al carrito después de añadir.
+*/
 const route = useRoute()
-const productId = route.params.id
+const router = useRouter()
+const { addItem } = useCart()
 
-const allergenIcons = {
-  Gluten: trigoIcon,
-  'Lácteos': lacteosIcon,
-  Huevo: huevosIcon,
-}
-
-const product = ref({
-  id: productId,
-  name: 'Fabada Asturiana',
-  price: 24.50,
-  image: fabadaImg,
-  description:
-    'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.',
-  ingredients: 'Fabes, chorizo, morcilla, panceta, cebolla y pimentón.',
-  allergens: ['Gluten', 'Lácteos', 'Huevo'],
-  available: true,
-})
-
-const notes = ref('')
+/*
+  Producto real que llega del back.
+  Empieza en null porque, al abrir la página, todavía no tenemos los datos.
+*/
+const product = ref(null)
+const cargando = ref(true)
+const errorCarga = ref(false)
 const quantity = ref(1)
 
+/*
+  Pide el producto al back con el id de la URL: GET /api/products/{id}.
+  fetch no lanza error si el servidor responde 404, por eso se comprueba response.ok a mano.
+  El precio llega como texto/decimal desde el back, así que se convierte a número
+  para poder calcular el total y formatearlo.
+*/
+async function cargarProducto() {
+  cargando.value = true
+  errorCarga.value = false
+  try {
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/products/${route.params.id}`)
+    if (!response.ok) throw new Error('Producto no encontrado')
+    const data = await response.json()
+    product.value = { ...data, price: Number(data.price) }
+  } catch (err) {
+    console.warn('No se pudo cargar el producto:', err)
+    errorCarga.value = true
+  } finally {
+    /* Se ejecuta siempre, haya ido bien o mal */
+    cargando.value = false
+  }
+}
+
+onMounted(cargarProducto)
+
+/* Precio y total con formato español (24,50) */
 const formattedPrice = computed(() =>
   product.value.price.toLocaleString('es-ES', { minimumFractionDigits: 2 })
 )
@@ -43,19 +59,43 @@ function increaseQuantity() {
 function decreaseQuantity() {
   if (quantity.value > 1) quantity.value--
 }
+
+/*
+  addItem suma de uno en uno, así que se llama tantas veces como indique la cantidad
+  (igual que en CartaView). Después se lleva al usuario al carrito como confirmación.
+*/
 function addToOrder() {
-  console.log('Añadir al pedido', {
-    productId: product.value.id,
-    quantity: quantity.value,
-    notes: notes.value,
-  })
+  for (let i = 0; i < quantity.value; i++) {
+    addItem(product.value)
+  }
+  router.push('/cart')
 }
 </script>
 
 <template>
   <div class="page text-left">
-    <div class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-[662px_466px] gap-8 md:gap-6 p-6 md:p-16 items-start">
-      <!-- Columna izquierda: 662px -->
+    <!-- Mientras llega la respuesta del back -->
+    <p v-if="cargando" class="p-16 text-center font-body text-body-md text-white">
+      Cargando el plato…
+    </p>
+
+    <!-- Si el producto no existe o el back no responde -->
+    <div v-else-if="errorCarga" class="p-16 text-center">
+      <p class="font-body text-body-md text-white">No hemos encontrado este plato.</p>
+      <RouterLink
+        to="/carta"
+        class="mt-6 inline-block rounded-lg bg-primary px-6 py-3 font-ui text-sm font-semibold text-on-primary"
+      >
+        Volver a la carta
+      </RouterLink>
+    </div>
+
+    <!-- Producto cargado correctamente -->
+    <div
+      v-else
+      class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-[662px_466px] gap-8 md:gap-6 p-6 md:p-16 items-start"
+    >
+      <!-- Columna izquierda: imagen, nombre, precio y descripción -->
       <div class="flex flex-col gap-8">
         <img
           :src="product.image"
@@ -75,50 +115,10 @@ function addToOrder() {
         <p class="font-body text-[16px] leading-6.5 font-normal text-white">
           {{ product.description }}
         </p>
-
-        <hr class="border-outline-variant/40" />
-
-        <div>
-          <h3 class="font-ui text-label-caps tracking-caps uppercase font-semibold text-outline">
-            Ingredientes
-          </h3>
-          <p class="font-body text-body-md text-white mt-1">{{ product.ingredients }}</p>
-        </div>
-
-        <hr class="border-outline-variant/40" />
-
-        <div>
-          <h3 class="font-ui text-label-caps tracking-caps uppercase font-semibold text-outline">
-            Alérgenos
-          </h3>
-          <div class="flex flex-wrap gap-4 mt-3">
-            <span
-              v-for="allergen in product.allergens"
-              :key="allergen"
-              class="flex items-center gap-1 font-ui text-label-caps tracking-caps text-white"
-            >
-              <img :src="allergenIcons[allergen]" class="w-4 h-4" alt="" />
-              {{ allergen }}
-            </span>
-          </div>
-        </div>
       </div>
 
-      <!-- Columna derecha: 466px, altura automática según contenido -->
+      <!-- Columna derecha: cantidad, resumen y botón -->
       <div class="bg-surface-container-low border border-outline-variant/20 rounded-lg shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)] p-6 md:p-8">
-        <p class="font-ui text-label-caps tracking-caps uppercase font-semibold text-on-surface">
-          ¿Quieres añadir alguna indicación?
-        </p>
-        <textarea
-          v-model="notes"
-          maxlength="250"
-          placeholder="Ej: Sin cebolla, sin salsa, poco hecho..."
-          class="mt-2 w-full h-32 bg-surface border border-highlight rounded-md p-3 font-body text-body-md resize-none"
-        ></textarea>
-        <p class="text-right font-ui text-label-caps text-outline">{{ notes.length }} / 250</p>
-
-        <hr class="my-4 border-outline-variant/30" />
-
         <div class="flex items-center justify-between">
           <span class="font-ui text-label-caps tracking-caps uppercase font-semibold text-on-surface">
             Cantidad
@@ -143,10 +143,6 @@ function addToOrder() {
               <span class="shrink-0">Cantidad:</span>
               <span class="text-right">{{ quantity }}</span>
             </div>
-            <div class="flex justify-between gap-2 font-body text-sm">
-              <span class="shrink-0">Indicaciones:</span>
-              <span class="text-right">{{ notes || 'sin indicaciones especiales' }}</span>
-            </div>
 
             <hr class="border-outline-variant/30" />
 
@@ -157,12 +153,13 @@ function addToOrder() {
           </div>
         </div>
 
+        <!-- Si el producto no está disponible, el botón se desactiva -->
         <button
           @click="addToOrder"
           :disabled="!product.available"
           class="mt-4 w-full bg-primary-container text-white rounded-xl py-4 font-ui text-button font-semibold disabled:opacity-50"
         >
-          AÑADIR AL PEDIDO
+          {{ product.available ? 'AÑADIR AL PEDIDO' : 'AGOTADO' }}
         </button>
       </div>
     </div>
@@ -170,7 +167,6 @@ function addToOrder() {
 </template>
 
 <style scoped>
-/* ⚠️ PROVISIONAL: valor aproximado a ojo, pendiente de confirmar con el hex real de Figma (fondo de la página) */
 .page {
   background-color: #7c8874;
   min-height: 100vh;

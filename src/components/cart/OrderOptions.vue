@@ -2,6 +2,7 @@
 import { ref } from "vue";
 
 const orderType = ref("restaurant");
+const scheduledOrder = ref("");
 
 const emit = defineEmits(["update-order-type", "update-scheduled-order"]);
 

@@ -1,58 +1,75 @@
 <script setup>
-import { onMounted, ref } from "vue";
+import { useRouter } from "vue-router";
+
 import CartItem from "../../components/cart/CartItem.vue";
 import CartSummary from "../../components/cart/CartSummary.vue";
 import CartEmpty from "../../components/cart/CartEmpty.vue";
+
 import { useCart } from "../../composables/useCart";
 import { useOrder } from "../../composables/useOrder.js";
+import { useAuth } from "../../composables/useAuth";
 
-import cachopoImage from "../../assets/images/menu/cachopo-tradicional.png";
-import tablaQuesosImage from "../../assets/images/eventos/chosco-evento.png"; //imagenes luego se cambian con la Api externa
+import { createOrder } from "../../services/orderService";
 
+const router = useRouter();
+
+// Carrito
 const {
   cartItems,
   subtotal,
   tax,
   total,
-  addItem,
   removeItem,
   increaseQuantity,
   decreaseQuantity,
 } = useCart();
+
+// Datos del pedido
 const {
-  orderType,
-  scheduledOrder,
   orderItems,
-  order,
   updateOrderType,
   updateScheduledOrder,
 } = useOrder(cartItems);
 
-// Productos temporales para probar el carrito
-const demoProducts = [
-  {
-    id: 1,
-    name: "Cachopo Tradicional",
-    description: "Con jamón ibérico y queso cabrales.",
-    price: 24,
-    image: cachopoImage,
-  },
-  {
-    id: 2,
-    name: "Tabla de quesos asturianos",
-    description: "Selección de quesos asturianos.",
-    price: 18,
-    image: tablaQuesosImage,
-  },
-];
+// Autenticación
+const { loadUser } = useAuth();
 
-// Añade productos de prueba mientras no tengamos la API
-onMounted(() => {
-  if (cartItems.value.length === 0) {
-    addItem(demoProducts[0]);
-    addItem(demoProducts[1]);
+// Crea el pedido y continúa al pago
+const handleContinue = async () => {
+  try {
+    const currentUser = await loadUser();
+
+    if (!currentUser?.id) {
+      router.push({
+        name: "login",
+        query: {
+          redirect: "/cart",
+        },
+      });
+
+      return;
+    }
+
+    const payload = {
+      userId: currentUser.id,
+      tableNumber: null,
+      items: orderItems.value,
+    };
+
+    const createdOrder = await createOrder(payload);
+
+    console.log("Pedido creado:", createdOrder);
+
+    await router.push({
+      name: "payment",
+      query: {
+        orderId: createdOrder.id,
+      },
+    });
+  } catch (error) {
+    console.error("No se pudo crear el pedido:", error);
   }
-});
+};
 </script>
 
 <template>
@@ -102,6 +119,7 @@ onMounted(() => {
           :total="total"
           @update-order-type="updateOrderType"
           @update-scheduled-order="updateScheduledOrder"
+          @continue="handleContinue"
         />
       </div>
     </section>

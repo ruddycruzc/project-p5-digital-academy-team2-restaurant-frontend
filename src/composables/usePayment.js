@@ -4,7 +4,7 @@ export function usePayment() {
   const paymentStatus = ref("idle");
   const paymentAttempts = ref(0);
 
-  const maxAttempts = 3;  //EL MAXIMO DE INTENTOS POR TARJETA
+  const maxAttempts = 3;
 
   const canRetry = computed(() => {
     return paymentAttempts.value < maxAttempts;
@@ -29,6 +29,27 @@ export function usePayment() {
     paymentStatus.value = "failed";
   };
 
+  const processPayment = async (paymentRequest) => {
+    if (!canRetry.value) {
+      paymentStatus.value = "max-attempts";
+      return null;
+    }
+
+    startPayment();
+
+    try {
+      const result = await paymentRequest();
+
+      confirmPayment();
+
+      return result;
+    } catch (error) {
+      failPayment();
+
+      throw error;
+    }
+  };
+
   const retryPayment = () => {
     if (!canRetry.value) {
       paymentStatus.value = "max-attempts";
@@ -51,9 +72,7 @@ export function usePayment() {
     paymentAttempts,
     maxAttempts,
     canRetry,
-    startPayment,
-    confirmPayment,
-    failPayment,
+    processPayment,
     retryPayment,
     resetPayment,
     cancelPayment,

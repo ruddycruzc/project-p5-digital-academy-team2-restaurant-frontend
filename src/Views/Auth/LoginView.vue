@@ -1,19 +1,34 @@
 <script setup>
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
-import AuthTabs from '../../components/AuthTabs.vue'
-import BaseInput from '../../components/BaseInput.vue'
-import BaseButton from '../../components/BaseButton.vue'
-import { loginUser } from '../../services/authService'
-import { saveToken } from '../../utils/authStorage'
+import { ref } from "vue";
+import { useRouter } from "vue-router";
+import AuthTabs from "../../components/AuthTabs.vue";
+import BaseInput from "../../components/BaseInput.vue";
+import BaseButton from "../../components/BaseButton.vue";
+import { loginUser } from "../../services/authService";
+import { saveToken } from "../../utils/authStorage";
+import { useAuth } from "../../composables/useAuth";
 
-const router = useRouter()
+const router = useRouter();
+const { loadUser } = useAuth();
 
-const email = ref('')
-const password = ref('')
-const rememberMe = ref(false)
-const submitting = ref(false)
-const errorMessage = ref('')
+function getDashboardRoute(user) {
+  const role = user.roles?.[0];
+
+  const dashboardRoutes = {
+    CUSTOMER: "account",
+    ADMIN: "admin-dashboard",
+    KITCHEN: "kitchen-dashboard",
+    DELIVERY: "delivery-dashboard",
+  };
+
+  return dashboardRoutes[role] || "home";
+}
+
+const email = ref("");
+const password = ref("");
+const rememberMe = ref(false);
+const submitting = ref(false);
+const errorMessage = ref("");
 
 async function handleSubmit() {
   errorMessage.value = ''
@@ -24,7 +39,11 @@ async function handleSubmit() {
 
     saveToken(response.token, rememberMe.value)
 
-    await router.push({ name: 'account' })
+    const currentUser = await loadUser()
+
+    await router.push({
+      name: getDashboardRoute(currentUser),
+    })
   } catch (error) {
     if (error.status === 401) {
       errorMessage.value = 'El correo o la contraseña no son correctos.'
@@ -43,11 +62,15 @@ async function handleSubmit() {
   <div class="flex min-h-screen">
     <div class="hidden flex-1 bg-surface-dim md:block"></div>
 
-    <div class="flex flex-1 items-center justify-center bg-surface px-6 py-16 md:px-16">
+    <div
+      class="flex flex-1 items-center justify-center bg-surface px-6 py-16 md:px-16"
+    >
       <div class="w-full max-w-md">
         <AuthTabs />
 
-        <h1 class="mt-10 font-headline text-headline-md font-medium text-on-surface">
+        <h1
+          class="mt-10 font-headline text-headline-md font-medium text-on-surface"
+        >
           Bienvenido de nuevo
         </h1>
 
@@ -75,7 +98,9 @@ async function handleSubmit() {
           />
 
           <div class="flex items-center justify-between">
-            <label class="flex items-center gap-2 font-body text-sm text-on-surface">
+            <label
+              class="flex items-center gap-2 font-body text-sm text-on-surface"
+            >
               <input
                 v-model="rememberMe"
                 type="checkbox"
@@ -100,11 +125,8 @@ async function handleSubmit() {
             {{ errorMessage }}
           </p>
 
-          <BaseButton
-            type="submit"
-            :disabled="submitting"
-          >
-            {{ submitting ? 'Iniciando sesión...' : 'Entrar' }}
+          <BaseButton type="submit" :disabled="submitting">
+            {{ submitting ? "Iniciando sesión..." : "Entrar" }}
           </BaseButton>
         </form>
 
@@ -120,5 +142,4 @@ async function handleSubmit() {
   </div>
 </template>
 
-<style scoped>
-</style>
+<style scoped></style>

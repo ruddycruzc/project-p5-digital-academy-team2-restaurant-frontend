@@ -1,5 +1,5 @@
 <script setup>
-import { ref, nextTick } from "vue";
+import { ref, nextTick, onMounted, onBeforeUnmount } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import logo from "../assets/images/branding/logo-Goxu.png";
 import userIcon from "../assets/images/home/login.png";
@@ -20,6 +20,8 @@ const links = [
 const route = useRoute();
 const router = useRouter();
 const menuOpen = ref(false);
+const userMenuOpen = ref(false);
+const userMenuRef = ref(null);
 
 const linkClasses =
   "inline-block font-ui text-sm font-semibold text-inverse-on-surface transition duration-300 hover:scale-105 hover:text-highlight";
@@ -44,15 +46,15 @@ async function goToContact() {
   setTimeout(scrollToContact, 650);
 }
 
-const { loadUser } = useAuth();
+const { user, loadUser, logout } = useAuth();
 const { cartItems } = useCart();
 
 async function handleUserClick() {
   try {
-    const currentUser = await loadUser();
+    const currentUser = user.value || (await loadUser());
 
     if (currentUser) {
-      router.push("/account");
+      userMenuOpen.value = !userMenuOpen.value;
       return;
     }
 
@@ -61,6 +63,26 @@ async function handleUserClick() {
     router.push("/login");
   }
 }
+
+function handleLogout() {
+  logout();
+  userMenuOpen.value = false;
+  menuOpen.value = false;
+  router.push("/");
+}
+function handleClickOutside(event) {
+  if (userMenuRef.value && !userMenuRef.value.contains(event.target)) {
+    userMenuOpen.value = false;
+  }
+}
+
+onMounted(() => {
+  document.addEventListener("click", handleClickOutside);
+});
+
+onBeforeUnmount(() => {
+  document.removeEventListener("click", handleClickOutside);
+});
 </script>
 
 <template>
@@ -99,13 +121,36 @@ async function handleUserClick() {
       </nav>
 
       <div class="flex items-center gap-4">
-        <button
-          type="button"
-          aria-label="Acceder a mi cuenta"
-          @click="handleUserClick"
-        >
-          <img :src="userIcon" alt="Mi cuenta" class="h-12 w-12 shrink-0" />
-        </button>
+        <div ref="userMenuRef" class="relative">
+          <button
+            type="button"
+            aria-label="Acceder a mi cuenta"
+            @click.stop="handleUserClick"
+          >
+            <img :src="userIcon" alt="Mi cuenta" class="h-12 w-12 shrink-0" />
+          </button>
+
+          <div
+            v-if="userMenuOpen"
+            class="absolute right-0 top-full z-50 mt-2 w-44 overflow-hidden rounded-xl border border-white/15 bg-surface shadow-lg"
+          >
+            <RouterLink
+              to="/account"
+              class="block px-4 py-3 font-ui text-sm text-on-surface transition-colors hover:bg-primary/10"
+              @click="userMenuOpen = false"
+            >
+              Mi cuenta
+            </RouterLink>
+
+            <button
+              type="button"
+              class="block w-full px-4 py-3 text-left font-ui text-sm text-on-surface transition-colors hover:bg-primary/10"
+              @click="handleLogout"
+            >
+              Cerrar sesión
+            </button>
+          </div>
+        </div>
         <RouterLink to="/cart" :class="[iconLinkClasses, 'relative']">
           <img :src="cartIcon" alt="Carrito" class="h-5 w-5 shrink-0" />
 

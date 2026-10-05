@@ -1,33 +1,48 @@
 <script setup>
-import { ref } from "vue";
+import { onMounted, ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
+
 import PaymentMethodSelector from "../../components/payment/PaymentMethodSelector.vue";
 import PaymentCard from "../../components/payment/PaymentCard.vue";
 import PaymentSummary from "../../components/payment/PaymentSummary.vue";
 import PaymentAction from "../../components/payment/PaymentAction.vue";
-import { usePayment } from "../../composables/usePayment";
-import BaseModal from "../../components/BaseModal.vue";
 import PaymentErrorModal from "../../components/payment/PaymentErrorModal.vue";
 import PaymentRejectedModal from "../../components/payment/PaymentRejectedModal.vue";
 import PaymentMaxAttemptsModal from "../../components/payment/PaymentMaxAttemptsModal.vue";
 import PaymentCancelModal from "../../components/payment/PaymentCancelModal.vue";
+import PaymentConfirmationModal from "../../components/payment/PaymentConfirmationModal.vue";
+
+import { usePayment } from "../../composables/usePayment";
+import { getOrderById, payOrder } from "../../services/orderService";
+
+import { useAuth } from "../../composables/useAuth";
+import { getCustomerProfile } from "../../services/ProfileService";
+
+const route = useRoute();
+const router = useRouter();
+const { user, loadUser } = useAuth();
+
+const paymentCard = ref(null);
 
 const paymentMethod = ref("card");
 const showCancelModal = ref(false);
 
-// Datos temporales mientras no conectemos useCart()
-const subtotal = ref(42);
-const tax = ref(4.2);
-const total = ref(46.2);
+const order = ref(null);
+const loadingOrder = ref(true);
+const orderError = ref(null);
+const paymentResult = ref(null);
+const customerProfile = ref(null);
+const paymentLastFourDigits = ref("");
+
+const subtotal = ref(0);
+const tax = ref(0);
+const total = ref(0);
 
 const {
   paymentStatus,
   paymentAttempts,
   maxAttempts,
-  canRetry,
-  startPayment,
-  confirmPayment,
-  failPayment,
-  retryPayment,
+  processPayment,
   resetPayment,
   cancelPayment,
 } = usePayment();
@@ -36,8 +51,27 @@ const updatePaymentMethod = (method) => {
   paymentMethod.value = method;
 };
 
-const handlePayment = () => {
-  startPayment();
+const handlePayment = async () => {
+  const orderId = route.query.orderId;
+  const paymentData = paymentCard.value?.getPaymentData();
+
+  if (!orderId || !paymentData) {
+    return;
+  }
+
+  try {
+    const paidOrder = await processPayment(() =>
+      payOrder(orderId, paymentData),
+    );
+
+    paymentResult.value = paidOrder;
+
+    paymentLastFourDigits.value = paymentData.cardNumber.slice(-4);
+
+    console.log("Pago realizado:", paidOrder);
+  } catch (error) {
+    console.error("No se pudo realizar el pago:", error);
+  }
 };
 
 const openCancelModal = () => {
@@ -47,10 +81,76 @@ const openCancelModal = () => {
 const closeCancelModal = () => {
   showCancelModal.value = false;
 };
+
 const confirmCancel = () => {
   showCancelModal.value = false;
   cancelPayment();
 };
+
+function handleTracking() {
+  const orderId = paymentResult.value?.id ?? order.value?.id;
+
+  if (!orderId) {
+    return;
+  }
+
+  router.push({
+    name: "order-tracking",
+    query: {
+      orderId,
+    },
+  });
+}
+
+const loadCustomerProfile = async () => {
+  try {
+    const currentUser = user.value || (await loadUser());
+
+    if (!currentUser?.id) {
+      throw new Error("No se ha podido identificar al usuario.");
+    }
+
+    customerProfile.value = await getCustomerProfile(currentUser.id);
+
+    console.log("Perfil del cliente cargado:", customerProfile.value);
+  } catch (error) {
+    console.error("No se pudo cargar el perfil del cliente:", error);
+  }
+};
+
+const loadOrder = async () => {
+  const orderId = route.query.orderId;
+
+  if (!orderId) {
+    orderError.value = "No se ha encontrado el pedido.";
+    loadingOrder.value = false;
+    return;
+  }
+
+  try {
+    const orderData = await getOrderById(orderId);
+
+    order.value = orderData;
+
+    const totalAmount = Number(orderData.total ?? 0);
+
+    total.value = Number(totalAmount.toFixed(2));
+    subtotal.value = Number((totalAmount / 1.1).toFixed(2));
+    tax.value = Number((totalAmount - subtotal.value).toFixed(2));
+
+    console.log("Pedido cargado:", orderData);
+  } catch (error) {
+    console.error("No se pudo cargar el pedido:", error);
+    orderError.value = "No se ha podido cargar el pedido.";
+  } finally {
+    loadingOrder.value = false;
+  }
+};
+
+onMounted(() => {
+  loadOrder();
+  loadCustomerProfile();
+});
 </script>
 
 <template>
@@ -78,39 +178,9 @@ const confirmCancel = () => {
         <section>
           <PaymentMethodSelector @update-method="updatePaymentMethod" />
 
-          <PaymentCard v-if="paymentMethod === 'card'" />
+          <PaymentCard v-if="paymentMethod === 'card'" ref="paymentCard" />
 
           <PaymentAction @submit-payment="handlePayment" />
-
-          <!-- Simulaciones para probar el flujo de pago -->
-          <div
-            v-if="paymentStatus === 'processing'"
-            class="mt-4 rounded-2xl bg-[var(--color-surface-container)] px-4 py-4 text-center"
-          >
-            <p
-              class="font-ui text-sm font-semibold text-[var(--color-on-surface)]"
-            >
-              Procesando el pago...
-            </p>
-
-            <div class="mt-4 flex flex-wrap justify-center gap-3">
-              <button
-                type="button"
-                class="rounded-full border border-[var(--color-outline-variant)] px-4 py-2 font-ui text-xs font-semibold text-[var(--color-on-surface)]"
-                @click="confirmPayment"
-              >
-                Simular pago confirmado
-              </button>
-
-              <button
-                type="button"
-                class="rounded-full border border-[var(--color-outline-variant)] px-4 py-2 font-ui text-xs font-semibold text-[var(--color-on-surface)]"
-                @click="failPayment"
-              >
-                Simular pago fallido
-              </button>
-            </div>
-          </div>
         </section>
 
         <aside>
@@ -122,7 +192,7 @@ const confirmCancel = () => {
 
   <PaymentErrorModal
     :open="paymentStatus === 'failed' && paymentAttempts === 1"
-    @retry="retryPayment"
+    @retry="handlePayment"
     @cancel="resetPayment"
   />
 
@@ -130,7 +200,7 @@ const confirmCancel = () => {
     :open="paymentStatus === 'failed' && paymentAttempts > 1"
     :attempts="paymentAttempts"
     :max-attempts="maxAttempts"
-    @retry="retryPayment"
+    @retry="handlePayment"
     @change-method="resetPayment"
   />
 
@@ -146,30 +216,24 @@ const confirmCancel = () => {
     @continue="closeCancelModal"
     @close="closeCancelModal"
   />
-  <!-- confirmación provisional -->
-  <BaseModal :open="paymentStatus === 'confirmed'" @close="resetPayment">
-    <div class="text-center">
-      <h2
-        class="font-headline text-3xl font-semibold text-[var(--color-on-surface)]"
-      >
-        ¡Pago confirmado!
-      </h2>
 
-      <p
-        class="mt-3 font-body text-sm leading-6 text-[var(--color-on-surface-variant)]"
-      >
-        Tu pago se ha realizado correctamente.
-      </p>
-
-      <button
-        type="button"
-        class="mt-6 rounded-full bg-[var(--color-primary)] px-6 py-3 font-ui text-sm font-semibold text-[var(--color-on-primary)]"
-        @click="resetPayment"
-      >
-        Continuar
-      </button>
-    </div>
-  </BaseModal>
+  <!--Queda pendiente que se muestre el nombre, y detalles del producto-->
+<PaymentConfirmationModal
+  :open="paymentStatus === 'confirmed'"
+  :payment-method="paymentMethod"
+  :amount="Number(paymentResult?.total ?? total)"
+  :order-id="paymentResult?.id ?? order?.id"
+  :last-four-digits="paymentLastFourDigits"
+  :customer-name="customerProfile?.name ?? order?.userName ?? ''"
+  :customer-surname="customerProfile?.surname ?? ''"
+  :address="customerProfile?.address ?? ''"
+  :postal-code="customerProfile?.postalCode ?? ''"
+  :city="customerProfile?.city ?? ''"
+  :items="paymentResult?.items ?? order?.items ?? []"
+  :status="paymentResult?.status ?? order?.status ?? 'PENDING'"
+  @close="resetPayment"
+  @tracking="handleTracking"
+/>
 </template>
 
 <style scoped></style>

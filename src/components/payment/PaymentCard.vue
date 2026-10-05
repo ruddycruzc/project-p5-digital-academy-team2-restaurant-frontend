@@ -5,6 +5,19 @@ const cardNumber = ref("");
 const cardName = ref("");
 const expiryDate = ref("");
 const cvv = ref("");
+
+const getPaymentData = () => {
+  return {
+    cardNumber: cardNumber.value.replace(/\s/g, ""),
+    cardName: cardName.value,
+    expiryDate: expiryDate.value,
+    cvv: cvv.value,
+  };
+};
+
+defineExpose({
+  getPaymentData,
+});
 </script>
 
 <template>

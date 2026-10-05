@@ -1,90 +1,129 @@
 import { ref } from "vue";
+import {
+  getReadyOrders,
+  getOrdersOnTheWay,
+  getDeliveredOrders,
+  startDelivery,
+  completeDelivery,
+} from "../services/deliveryService";
+import { getCustomerProfile } from "../services/profileService";
 
-function formatToday() {
-    const now = new Date();
-    return `Hoy (${now.getDate()}/${now.getMonth() + 1}/${String(now.getFullYear()).slice(-2)})`;
+export const currentService = ref(null);
+export const availableService = ref(null);
+export const allOrders = ref([]);
+
+export const loading = ref(false);
+export const error = ref(null);
+
+const profileCache = new Map();
+
+async function getProfile(userId) {
+  if (!userId) return null;
+
+  if (profileCache.has(userId)) {
+    return profileCache.get(userId);
+  }
+
+  try {
+    const profile = await getCustomerProfile(userId);
+
+    profileCache.set(userId, profile);
+
+    return profile;
+  } catch (err) {
+    console.error(`No se ha podido cargar el perfil ${userId}:`, err);
+    return null;
+  }
 }
 
-export const currentService = ref({
-    id: "#047",
-    price: 38.5,
-    paymentMethod: "Tarjeta (Pagado)",
-    establishment: "Gochu Centro (Calle Mayor, 15)",
-    customerName: "Carmen Alonso",
-    customerAddress: "Av. de la Constitución, 45, 3ºB",
-    customerPhone: "+34 600 123 456",
-    items: [
-        { name: "Bocadillo de calamares", quantity: 2 },
-        { name: "Ración de croquetas caseras", quantity: 1 },
-        { name: "Sidra natural (botella)", quantity: 1 },
-    ],
-});
+async function adaptOrder(order) {
+  const profile = await getProfile(order.userId);
 
-export const availableService = ref({
-    id: "#048",
-    price: 29.9,
-    paymentMethod: "Efectivo (Pagar al recibir)",
-    establishmentName: "Gochu Centro",
-    pickupAddress: "Calle Mayor, 15 · 33206 Gijón, Asturias",
-    pickupNote: "Recoger el pedido preparado en Gochu Centro",
-    customerName: "Laura Fernández",
-    customerAddress: "Calle Uría, 12, Bajo D",
-    customerPhone: "+34 622 987 654",
-    distance: "1,8 km",
-    prepTime: "Listo en 5 min",
-    type: "A domicilio",
-    items: [
-        { name: "Fabada asturiana", quantity: 1 },
-        { name: "Pan de sidra", quantity: 2 },
-    ],
-});
+  return {
+    id: order.id,
+    price: Number(order.total),
+    customerName: order.userName,
+    customerAddress: profile?.address || "",
+    customerPostalCode: profile?.postalCode || "",
+    customerCity: profile?.city || "",
+    customerPhone: profile?.phone || "",
+    status: order.status,
+    paid: order.paid,
+    createdAt: order.createdAt,
+    tableNumber: order.tableNumber,
+    userId: order.userId,
+    items: order.items ?? [],
+  };
+}
 
-export const allOrders = ref([
-    { id: "#045", date: "Hoy (16/9/26)", time: "13:40", address: "Calle Corrida, 28", distance: "2,1 km", price: 42.0, status: "Entregado" },
-    { id: "#041", date: "Hoy (16/9/26)", time: "12:55", address: "Paseo de Begoña, 14", distance: "1,4 km", price: 21.5, status: "Entregado" },
-    { id: "#038", date: "Ayer (15/9/26)", time: "19:20", address: "Calle Uría, 12, Bajo D", distance: "1,8 km", price: 29.9, status: "Entregado" },
-    { id: "#032", date: "Ayer (15/9/26)", time: "14:05", address: "Calle Corrida, 5", distance: "0,9 km", price: 18.2, status: "Entregado" },
-    { id: "#025", date: "Lun (14/9/26)", time: "20:15", address: "Plaza del Humedal, 3", distance: "2,4 km", price: 33.4, status: "Entregado" },
-]);
+export async function loadDeliveryState() {
+  loading.value = true;
+  error.value = null;
 
-export function acceptOrder() {
-    if (!availableService.value) return;
+  try {
+    const [readyOrders, onTheWayOrders, deliveredOrders] =
+      await Promise.all([
+        getReadyOrders(),
+        getOrdersOnTheWay(),
+        getDeliveredOrders(),
+      ]);
 
-    if (!currentService.value) {
-        currentService.value = {
-            id: availableService.value.id,
-            price: availableService.value.price,
-            paymentMethod: availableService.value.paymentMethod,
-            establishment: `${availableService.value.establishmentName} (${availableService.value.pickupAddress})`,
-            customerName: availableService.value.customerName,
-            customerAddress: availableService.value.customerAddress,
-            customerPhone: availableService.value.customerPhone,
-            items: availableService.value.items,
-        };
-    }
+    availableService.value = readyOrders.length
+      ? await adaptOrder(readyOrders[0])
+      : null;
 
+    currentService.value = onTheWayOrders.length
+      ? await adaptOrder(onTheWayOrders[0])
+      : null;
+
+    allOrders.value = await Promise.all(
+      deliveredOrders.map(adaptOrder),
+    );
+  } catch (err) {
+    error.value = err;
+  } finally {
+    loading.value = false;
+  }
+}
+
+export async function acceptOrder() {
+  if (!availableService.value) return;
+
+  loading.value = true;
+  error.value = null;
+
+  try {
+    const updatedOrder = await startDelivery(availableService.value.id);
+
+    currentService.value = await adaptOrder(updatedOrder);
     availableService.value = null;
+  } catch (err) {
+    error.value = err;
+  } finally {
+    loading.value = false;
+  }
+}
+
+export async function deliverOrder() {
+  if (!currentService.value) return;
+
+  loading.value = true;
+  error.value = null;
+
+  try {
+    const updatedOrder = await completeDelivery(currentService.value.id);
+
+    const deliveredOrder = await adaptOrder(updatedOrder);
+
+    allOrders.value.unshift(deliveredOrder);
+    currentService.value = null;
+  } catch (err) {
+    error.value = err;
+  } finally {
+    loading.value = false;
+  }
 }
 
 export function rejectOrder() {
-    availableService.value = null;
-}
-
-export function deliverOrder(remainingDistance) {
-    if (!currentService.value) return;
-
-    const now = new Date();
-    const time = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-
-    allOrders.value.unshift({
-        id: currentService.value.id,
-        date: formatToday(),
-        time,
-        address: currentService.value.customerAddress,
-        distance: remainingDistance ?? "—",
-        price: currentService.value.price,
-        status: "Entregado",
-    });
-
-    currentService.value = null;
+  availableService.value = null;
 }
