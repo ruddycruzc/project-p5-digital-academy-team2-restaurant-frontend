@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { formatCurrency } from "@/utils/formatCurrency";
 import {
   TrendingUp,
@@ -9,57 +9,98 @@ import {
   Clock,
   ChefHat,
   CheckCircle2,
+  XCircle,
 } from "lucide-vue-next";
-import fabadaImg from "@/assets/images/menu/fabada.png";
-import cachopoImg from "@/assets/images/menu/cachopo-tradicional.png";
-import arrozImg from "@/assets/images/menu/arroz-con-leche.png";
+import { getAdminDashboardSummary } from "@/services/adminDashboardService";
+import { getBillingReport } from "@/services/billingService";
 
-const stats = ref([
-  {
-    label: "Ventas Diario",
-    value: 1245,
-    change: "↑ 12% vs ayer",
-    icon: Wallet,
-    up: true,
-    isCurrency: true,
-  },
-  {
-    label: "Ventas Mensual",
-    value: 18750,
-    change: "↑ 8.2% vs mes anterior",
-    icon: TrendingUp,
-    up: true,
-    isCurrency: true,
-  },
-  {
-    label: "Ventas Trimestral",
-    value: 34500,
-    change: "↑ 5.4% vs trimestre anterior",
-    icon: BarChart3,
-    up: true,
-    isCurrency: true,
-  },
-  {
-    label: "Ventas Anual",
-    value: "€182k",
-    change: "En línea con proyección",
-    icon: LineChart,
-    up: false,
-    isCurrency: false,
-  },
-]);
+const summary = ref(null);
+const weeklySales = ref([]);
+const cargando = ref(true);
+const error = ref(false);
 
-const weeklySales = ref([
-  { day: "Lun", value: 1200 },
-  { day: "Mar", value: 2000 },
-  { day: "Mié", value: 1400 },
-  { day: "Jue", value: 2500 },
-  { day: "Vie", value: 2900 },
-  { day: "Sáb", value: 3100 },
-  { day: "Dom", value: 1600 },
-]);
+const stats = computed(() => {
+  if (!summary.value) return [];
+  return [
+    {
+      label: "Ventas Hoy",
+      value: summary.value.todayRevenue,
+      icon: Wallet,
+      isCurrency: true,
+    },
+    {
+      label: "Ventas Totales",
+      value: summary.value.totalRevenue,
+      icon: TrendingUp,
+      isCurrency: true,
+    },
+    {
+      label: "Pedidos Hoy",
+      value: summary.value.todayOrders,
+      icon: BarChart3,
+      isCurrency: false,
+    },
+    {
+      label: "Pedidos Totales",
+      value: summary.value.totalOrders,
+      icon: LineChart,
+      isCurrency: false,
+    },
+  ];
+});
+
+const STATUS_CONFIG = {
+  PENDING: {
+    label: "Pendientes",
+    sub: "Requieren atención",
+    icon: Clock,
+    bg: "bg-error-container",
+    text: "text-error",
+  },
+  IN_KITCHEN: {
+    label: "En Cocina",
+    sub: "Preparando",
+    icon: ChefHat,
+    bg: "bg-tertiary-container",
+    text: "text-tertiary",
+  },
+  ON_THE_WAY: {
+    label: "En Reparto",
+    sub: "De camino",
+    icon: ChefHat,
+    bg: "bg-tertiary-container",
+    text: "text-tertiary",
+  },
+  DELIVERED: {
+    label: "Entregados",
+    sub: "Hoy",
+    icon: CheckCircle2,
+    bg: "bg-secondary-container",
+    text: "text-secondary",
+  },
+  CANCELLED: {
+    label: "Cancelados",
+    sub: "Hoy",
+    icon: XCircle,
+    bg: "bg-error-container",
+    text: "text-error",
+  },
+};
+
+const orderStatus = computed(() => {
+  if (!summary.value) return [];
+  return Object.entries(STATUS_CONFIG)
+    .filter(([key]) => summary.value.ordersByStatus?.[key] !== undefined)
+    .map(([key, cfg]) => ({
+      ...cfg,
+      count: summary.value.ordersByStatus[key],
+    }));
+});
+
+const starProducts = computed(() => summary.value?.topProducts ?? []);
+
 const maxSale = computed(() =>
-  Math.max(...weeklySales.value.map((d) => d.value)),
+  Math.max(1, ...weeklySales.value.map((d) => d.value)),
 );
 
 const barColors = [
@@ -76,56 +117,49 @@ function barColor(index) {
   return barColors[index % barColors.length];
 }
 
-const orderStatus = ref([
-  {
-    label: "Pendientes",
-    sub: "Requieren atención",
-    count: 12,
-    icon: Clock,
-    bg: "bg-error-container",
-    text: "text-error",
-  },
-  {
-    label: "En Cocina",
-    sub: "Preparando",
-    count: 8,
-    icon: ChefHat,
-    bg: "bg-tertiary-container",
-    text: "text-tertiary",
-  },
-  {
-    label: "Entregados",
-    sub: "Hoy",
-    count: 45,
-    icon: CheckCircle2,
-    bg: "bg-secondary-container",
-    text: "text-secondary",
-  },
-]);
+function toISODate(date) {
+  return date.toISOString().split("T")[0];
+}
 
-const starProducts = ref([
-  {
-    image: cachopoImg,
-    name: "Cachopo Tradicional",
-    category: "Platos Principales",
-    sold: 142,
-    revenue: "€3,408",
-  },
-  {
-    image: fabadaImg,
-    name: "Fabada Asturiana",
-    category: "Guisos",
-    sold: 98,
-    revenue: "€1,862",
-  },
-  {
-    image: arrozImg,
-    name: "Arroz con Leche Quemado",
-    category: "Postres",
-    sold: 85,
-    revenue: "€510",
-  },
-]);
+function getWeekRange() {
+  const now = new Date();
+  const day = now.getDay();
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() + diffToMonday);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  return { monday, start: toISODate(monday), end: toISODate(sunday) };
+}
+
+async function cargarGrafica() {
+  const { monday, start, end } = getWeekRange();
+  const report = await getBillingReport(start, end);
+  const dayLabels = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+
+  weeklySales.value = dayLabels.map((label, i) => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    const key = toISODate(d);
+    return { day: label, value: Number(report.revenueByDay?.[key] ?? 0) };
+  });
+}
+
+async function cargarDashboard() {
+  cargando.value = true;
+  error.value = false;
+  try {
+    summary.value = await getAdminDashboardSummary();
+    await cargarGrafica();
+  } catch (err) {
+    console.error("No se pudo cargar el dashboard:", err);
+    error.value = true;
+  } finally {
+    cargando.value = false;
+  }
+}
+
+onMounted(cargarDashboard);
 </script>
 
 <template>
@@ -137,7 +171,14 @@ const starProducts = ref([
       Visión general del rendimiento de Goxu hoy.
     </p>
 
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+    <p v-if="error" class="font-ui text-sm text-error mt-2">
+      No se han podido cargar los datos del backend.
+    </p>
+
+    <div
+      v-if="!cargando"
+      class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4"
+    >
       <div
         v-for="stat in stats"
         :key="stat.label"
@@ -153,13 +194,6 @@ const starProducts = ref([
 
         <p class="font-headline text-2xl font-semibold text-on-surface mt-2">
           {{ stat.isCurrency ? formatCurrency(stat.value) : stat.value }}
-        </p>
-
-        <p
-          class="font-ui text-xs mt-1"
-          :class="stat.up ? 'text-primary' : 'text-outline'"
-        >
-          {{ stat.change }}
         </p>
       </div>
     </div>
@@ -178,14 +212,6 @@ const starProducts = ref([
           >
         </div>
         <div class="flex gap-3 mt-4 overflow-x-auto">
-          <div
-            class="flex flex-col justify-between h-40 font-ui text-xs text-outline shrink-0"
-          >
-            <span>3k</span>
-            <span>2k</span>
-            <span>1k</span>
-            <span>0</span>
-          </div>
           <div class="flex-1 flex items-end gap-3 h-40 min-w-100">
             <div
               v-for="(d, index) in weeklySales"
@@ -255,79 +281,25 @@ const starProducts = ref([
           >Ver menú completo</RouterLink
         >
       </div>
-      <div
-        class="md:hidden flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory"
-      >
-        <div
-          v-for="product in starProducts"
-          :key="product.name"
-          class="min-w-[240px] snap-start bg-surface-container rounded-xl p-3 border border-outline-variant/20"
-        >
-          <img
-            :src="product.image"
-            alt=""
-            class="w-full h-32 object-cover rounded-lg"
-          />
-
-          <div class="mt-3">
-            <p class="font-ui font-semibold text-on-surface">
-              {{ product.name }}
-            </p>
-
-            <p class="font-body text-xs text-outline mt-1">
-              {{ product.category }}
-            </p>
-
-            <div class="flex items-center justify-between mt-3">
-              <div>
-                <p class="font-ui text-xs text-outline">Vendidos</p>
-                <p class="font-headline text-lg font-semibold text-on-surface">
-                  {{ product.sold }}
-                </p>
-              </div>
-
-              <div class="text-right">
-                <p class="font-ui text-xs text-outline">Ingresos</p>
-                <p class="font-ui text-sm font-semibold text-primary">
-                  {{ product.revenue }}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <table class="hidden md:table w-full min-w-125">
+      <table class="w-full min-w-125">
         <thead>
           <tr
             class="font-ui text-xs text-outline text-left border-b border-outline-variant/30"
           >
             <th class="pb-2">Producto</th>
-            <th class="pb-2">Categoría</th>
-            <th class="pb-2 text-right">Vendidos</th>
-            <th class="pb-2 text-right">Ingresos</th>
+            <th class="pb-2 text-right">Unidades vendidas</th>
           </tr>
         </thead>
         <tbody>
           <tr
             v-for="p in starProducts"
-            :key="p.name"
+            :key="p.productId"
             class="border-b border-outline-variant/20 last:border-0"
           >
-            <td class="py-2 flex items-center gap-3">
-              <img
-                :src="p.image"
-                alt=""
-                class="w-12 h-12 rounded-lg object-cover"
-              />
-              <span class="font-ui font-semibold text-on-surface">{{
-                p.name
-              }}</span>
+            <td class="py-2 font-ui font-semibold text-on-surface">
+              {{ p.productName }}
             </td>
-            <td class="font-body text-outline">{{ p.category }}</td>
-            <td class="text-right font-ui">{{ p.sold }}</td>
-            <td class="text-right font-ui font-semibold text-primary">
-              {{ p.revenue }}
-            </td>
+            <td class="text-right font-ui">{{ p.unitsSold }}</td>
           </tr>
         </tbody>
       </table>

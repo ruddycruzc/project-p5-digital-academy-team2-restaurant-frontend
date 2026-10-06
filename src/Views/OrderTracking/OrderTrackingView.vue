@@ -91,7 +91,7 @@ onMounted(loadTracking);
 </script>
 
 <template>
-    <main class="min-h-screen bg-surface px-4 py-10 sm:px-6 lg:px-8">
+    <main class="min-h-screen bg-outline-variant/50 px-4 py-10 sm:px-6 lg:px-8">
         <section class="mx-auto w-full max-w-3xl">
             <header class="mb-8">
                 <p

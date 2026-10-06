@@ -1,6 +1,7 @@
 <script setup>
-import { ref, watch } from "vue";
+import { ref, watch, onMounted, computed } from "vue";
 import { useRouter } from "vue-router";
+import { useAuth } from "../composables/useAuth";
 import logo from "../assets/images/branding/logo-Goxu.png";
 import {
   LayoutGrid,
@@ -13,6 +14,13 @@ import {
 } from "lucide-vue-next";
 
 const router = useRouter();
+const { user, loadUser, logout: authLogout } = useAuth();
+
+onMounted(() => {
+  if (!user.value) {
+    loadUser();
+  }
+});
 
 const navItems = [
   { name: "admin-dashboard", label: "Resumen", icon: LayoutGrid },
@@ -21,10 +29,14 @@ const navItems = [
   { name: "admin-billing", label: "Facturación", icon: Receipt },
 ];
 
-const admin = ref({
-  name: "Admin User",
-  email: "admin@goxu.com",
-  avatar: "https://i.pravatar.cc/150?img=47",
+const initials = computed(() => {
+  if (!user.value?.name) return "A";
+  return user.value.name
+    .split(" ")
+    .map((n) => n[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
 });
 
 const mobileMenuOpen = ref(false);
@@ -37,6 +49,7 @@ watch(() => router.currentRoute.value.fullPath, closeMenu);
 
 function logout() {
   closeMenu();
+  authLogout();
   router.push({ name: "login" });
 }
 </script>
@@ -87,33 +100,39 @@ function logout() {
             <component
               :is="item.icon"
               class="w-4 h-4 text-highlight/80 transition-transform duration-200 group-hover:scale-105"
-  />
+            />
             {{ item.label }}
           </RouterLink>
         </nav>
       </div>
 
       <div>
-        <hr class="border-inverse-on-surface/15 mb-4"  />
+        <hr class="border-inverse-on-surface/15 mb-4" />
         <div class="flex items-center gap-3">
-          <img
-            :src="admin.avatar"
-            alt=""
-            class="w-9 h-9 rounded-full object-cover"
-          />
+          <div
+            class="w-9 h-9 rounded-full bg-highlight/30 flex items-center justify-center shrink-0"
+          >
+            <span
+              class="font-ui text-xs font-semibold text-inverse-on-surface"
+              >{{ initials }}</span
+            >
+          </div>
           <div>
             <p class="font-ui text-sm font-semibold text-inverse-on-surface">
-              {{ admin.name }}
+              {{ user?.name || "Administrador" }}
             </p>
             <p class="font-ui text-xs text-inverse-on-surface/50">
-              {{ admin.email }}
+              {{ user?.email || "" }}
             </p>
           </div>
         </div>
         <button
           @click="logout"
-          class="group mt-4 flex items-center gap-2 font-ui text-sm font-semibold text-highlight transition-colors duration-200 hover:text-highlight/80">
-          <LogOut class="w-4 h-4 transition-transform duration-200 group-hover:translate-x-0.5"/>
+          class="group mt-4 flex items-center gap-2 font-ui text-sm font-semibold text-highlight transition-colors duration-200 hover:text-highlight/80"
+        >
+          <LogOut
+            class="w-4 h-4 transition-transform duration-200 group-hover:translate-x-0.5"
+          />
           Log out
         </button>
       </div>

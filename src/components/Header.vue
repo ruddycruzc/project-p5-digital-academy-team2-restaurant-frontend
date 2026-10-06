@@ -27,7 +27,7 @@ const linkClasses =
   "inline-block font-ui text-sm font-semibold text-inverse-on-surface transition duration-300 hover:scale-105 hover:text-highlight";
 
 const iconLinkClasses =
-  "flex h-10 w-10 items-center justify-center rounded-lg bg-transparent transition-colors duration-500 ease-in-out hover:bg-inverse-on-surface/15";
+  "flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 ring-1 ring-primary/20 transition-colors duration-300 ease-in-out hover:bg-primary/25";
 
 function scrollToContact() {
   document
@@ -87,7 +87,7 @@ onBeforeUnmount(() => {
 
 <template>
   <header
-    class="sticky top-0 z-50 mx-4 rounded-2xl border border-white/15 bg-black/30 px-5 py-3 backdrop-blur-xl shadow-lg md:mx-8 md:px-8"
+    class="sticky top-0 z-50 w-full border-b border-primary/30 bg-linear-to-r from-black/90 via-black/60 to-primary/15 px-5 py-3 backdrop-blur-xl shadow-[0_4px_20px_rgba(194,24,91,0.15)] md:px-8"
   >
     <div class="flex items-center justify-between gap-6">
       <RouterLink to="/" class="shrink-0">
@@ -125,9 +125,10 @@ onBeforeUnmount(() => {
           <button
             type="button"
             aria-label="Acceder a mi cuenta"
+            class="flex h-11 w-11 items-center justify-center rounded-full bg-primary/10 ring-1 ring-primary/20 transition-colors duration-300 hover:bg-primary/25"
             @click.stop="handleUserClick"
           >
-            <img :src="userIcon" alt="Mi cuenta" class="h-12 w-12 shrink-0" />
+            <img :src="userIcon" alt="Mi cuenta" class="h-7 w-7 shrink-0" />
           </button>
 
           <div

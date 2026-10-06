@@ -28,13 +28,13 @@
       Todavía no has añadido ningún plato a tu pedido.
     </p>
 
-    <button
-      type="button"
+    <RouterLink
+      to="/carta"
       class="mt-6 rounded-full bg-[var(--color-primary)] px-6 py-3 font-ui text-sm font-semibold text-[var(--color-on-primary)] transition-transform hover:scale-[1.01]"
     >
       Ver carta
       <span aria-hidden="true">→</span>
-    </button>
+    </RouterLink>
   </section>
 </template>
 

@@ -1,18 +1,37 @@
 <script setup>
 import { ref, computed, onMounted } from "vue";
-import { Search } from "lucide-vue-next";
+import { Search, Plus, Pencil, Trash2, X } from "lucide-vue-next";
 import fabadaImg from "@/assets/images/menu/fabada.png";
 import sidraImg from "@/assets/images/menu/sidra.png";
 import arrozImg from "@/assets/images/menu/arroz-con-leche.png";
 import { formatCurrency } from "@/utils/formatCurrency";
+import {
+  getProducts,
+  createProduct,
+  updateProduct,
+  deleteProduct,
+} from "@/services/productService";
 
-const categories = ["Todos", "Especialidades", "Bebidas", "Postres"];
+const categories = [
+  "Todos",
+  "Entrantes",
+  "Especialidades",
+  "Carnes",
+  "Pescados",
+  "Postres",
+  "Bebidas",
+];
 const categoryStyles = {
   Todos: { bg: "bg-primary-container", text: "text-on-primary-container" },
+  Entrantes: { bg: "bg-secondary-container", text: "text-secondary" },
   Especialidades: { bg: "bg-secondary-container", text: "text-secondary" },
-  Bebidas: { bg: "bg-tertiary-container", text: "text-tertiary" },
+  Carnes: { bg: "bg-error/15", text: "text-error" },
+  Pescados: { bg: "bg-tertiary-container", text: "text-tertiary" },
   Postres: { bg: "bg-highlight/20", text: "text-highlight" },
+  Bebidas: { bg: "bg-tertiary-container", text: "text-tertiary" },
 };
+const formCategories = categories.filter((c) => c !== "Todos");
+
 const activeCategory = ref("Todos");
 const searchQuery = ref("");
 
@@ -54,9 +73,7 @@ async function cargarProductos() {
   cargando.value = true;
   errorCarga.value = false;
   try {
-    const response = await fetch("/api/productos");
-    if (!response.ok) throw new Error("Error al cargar productos");
-    products.value = await response.json();
+    products.value = await getProducts();
   } catch (err) {
     console.warn(
       "No se pudo conectar con el backend de productos, usando datos de ejemplo:",
@@ -89,18 +106,121 @@ async function toggleAvailability(productId) {
   product.available = nuevoEstado;
 
   try {
-    const response = await fetch(`/api/productos/${productId}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ available: nuevoEstado }),
+    await updateProduct(productId, {
+      name: product.name,
+      description: product.description,
+      price: product.price,
+      image: product.image,
+      category: product.category,
+      available: nuevoEstado,
+      featured: product.featured || false,
+      badgeLabel: product.badgeLabel || null,
+      badgeTone: product.badgeTone || null,
     });
-    if (!response.ok) throw new Error("Error al actualizar disponibilidad");
   } catch (err) {
     console.warn(
       "No se pudo actualizar en el backend, revirtiendo cambio local:",
       err,
     );
     product.available = !nuevoEstado;
+  }
+}
+
+const showForm = ref(false);
+const editingId = ref(null);
+const guardando = ref(false);
+const formError = ref(false);
+
+const form = ref({
+  name: "",
+  description: "",
+  price: 0,
+  image: "",
+  category: "Entrantes",
+  available: true,
+  featured: false,
+  badgeLabel: "",
+  badgeTone: "",
+});
+
+function abrirCrear() {
+  editingId.value = null;
+  form.value = {
+    name: "",
+    description: "",
+    price: 0,
+    image: "",
+    category: "Entrantes",
+    available: true,
+    featured: false,
+    badgeLabel: "",
+    badgeTone: "",
+  };
+  formError.value = false;
+  showForm.value = true;
+}
+
+function abrirEditar(product) {
+  editingId.value = product.id;
+  form.value = {
+    name: product.name,
+    description: product.description,
+    price: product.price,
+    image: product.image,
+    category: product.category,
+    available: product.available,
+    featured: product.featured || false,
+    badgeLabel: product.badgeLabel || "",
+    badgeTone: product.badgeTone || "",
+  };
+  formError.value = false;
+  showForm.value = true;
+}
+
+function cerrarForm() {
+  showForm.value = false;
+}
+
+async function guardarProducto() {
+  guardando.value = true;
+  formError.value = false;
+
+  const payload = {
+    name: form.value.name,
+    description: form.value.description,
+    price: Number(form.value.price),
+    image: form.value.image,
+    category: form.value.category,
+    available: form.value.available,
+    featured: form.value.featured,
+    badgeLabel: form.value.badgeLabel || null,
+    badgeTone: form.value.badgeTone || null,
+  };
+
+  try {
+    if (editingId.value) {
+      const actualizado = await updateProduct(editingId.value, payload);
+      const idx = products.value.findIndex((p) => p.id === editingId.value);
+      if (idx !== -1) products.value[idx] = actualizado;
+    } else {
+      const creado = await createProduct(payload);
+      products.value.push(creado);
+    }
+    showForm.value = false;
+  } catch (err) {
+    console.error("No se pudo guardar el producto:", err);
+    formError.value = true;
+  } finally {
+    guardando.value = false;
+  }
+}
+
+async function eliminarProducto(productId) {
+  try {
+    await deleteProduct(productId);
+    products.value = products.value.filter((p) => p.id !== productId);
+  } catch (err) {
+    console.error("No se pudo eliminar el producto:", err);
   }
 }
 
@@ -129,9 +249,11 @@ defineExpose({
       </div>
       <button
         type="button"
-        class="bg-primary-container text-white font-ui font-semibold px-5 py-3 rounded-xl w-full sm:w-auto"
+        @click="abrirCrear"
+        class="bg-primary-container text-white font-ui font-semibold px-5 py-3 rounded-xl w-full sm:w-auto flex items-center justify-center gap-2"
       >
-        + AÑADIR PRODUCTO
+        <Plus class="w-4 h-4" />
+        AÑADIR PRODUCTO
       </button>
     </div>
 
@@ -226,6 +348,24 @@ defineExpose({
               ></span>
             </button>
           </div>
+          <div
+            class="flex items-center gap-2 border-t border-outline-variant/20 pt-3"
+          >
+            <button
+              type="button"
+              @click="abrirEditar(p)"
+              class="flex-1 flex items-center justify-center gap-2 bg-surface-container-low text-on-surface font-ui text-sm py-2 rounded-lg"
+            >
+              <Pencil class="w-4 h-4" /> Editar
+            </button>
+            <button
+              type="button"
+              @click="eliminarProducto(p.id)"
+              class="flex-1 flex items-center justify-center gap-2 bg-error/10 text-error font-ui text-sm py-2 rounded-lg"
+            >
+              <Trash2 class="w-4 h-4" /> Eliminar
+            </button>
+          </div>
         </div>
       </div>
 
@@ -295,11 +435,119 @@ defineExpose({
                   ></span>
                 </button>
               </td>
-              <td class="p-4"></td>
+              <td class="p-4">
+                <div class="flex items-center gap-2">
+                  <button
+                    type="button"
+                    @click="abrirEditar(p)"
+                    class="p-2 rounded-lg bg-surface-container-low text-on-surface"
+                    title="Editar"
+                  >
+                    <Pencil class="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    @click="eliminarProducto(p.id)"
+                    class="p-2 rounded-lg bg-error/10 text-error"
+                    title="Eliminar"
+                  >
+                    <Trash2 class="w-4 h-4" />
+                  </button>
+                </div>
+              </td>
             </tr>
           </tbody>
         </table>
       </div>
     </template>
+
+    <div
+      v-if="showForm"
+      class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+    >
+      <div
+        class="bg-surface-container-lowest rounded-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto"
+      >
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="font-headline text-xl text-on-surface">
+            {{ editingId ? "Editar producto" : "Nuevo producto" }}
+          </h2>
+          <button type="button" @click="cerrarForm">
+            <X class="w-5 h-5 text-outline" />
+          </button>
+        </div>
+
+        <p v-if="formError" class="font-ui text-sm text-error mb-3">
+          No se ha podido guardar el producto. Revisa los datos.
+        </p>
+
+        <form @submit.prevent="guardarProducto" class="flex flex-col gap-3">
+          <input
+            v-model="form.name"
+            type="text"
+            placeholder="Nombre"
+            required
+            class="bg-surface-container-low rounded-lg px-3 py-2 font-body"
+          />
+          <textarea
+            v-model="form.description"
+            placeholder="Descripción"
+            required
+            class="bg-surface-container-low rounded-lg px-3 py-2 font-body"
+          ></textarea>
+          <input
+            v-model.number="form.price"
+            type="number"
+            step="0.01"
+            min="0"
+            placeholder="Precio"
+            required
+            class="bg-surface-container-low rounded-lg px-3 py-2 font-body"
+          />
+          <input
+            v-model="form.image"
+            type="text"
+            placeholder="Ruta de imagen (ej: /menu-img/fabada.png)"
+            required
+            class="bg-surface-container-low rounded-lg px-3 py-2 font-body"
+          />
+          <select
+            v-model="form.category"
+            class="bg-surface-container-low rounded-lg px-3 py-2 font-body"
+          >
+            <option v-for="cat in formCategories" :key="cat" :value="cat">
+              {{ cat }}
+            </option>
+          </select>
+          <input
+            v-model="form.badgeLabel"
+            type="text"
+            placeholder="Etiqueta (opcional)"
+            class="bg-surface-container-low rounded-lg px-3 py-2 font-body"
+          />
+          <div class="flex items-center gap-4">
+            <label
+              class="flex items-center gap-2 font-ui text-sm text-on-surface"
+            >
+              <input v-model="form.available" type="checkbox" />
+              Disponible
+            </label>
+            <label
+              class="flex items-center gap-2 font-ui text-sm text-on-surface"
+            >
+              <input v-model="form.featured" type="checkbox" />
+              Destacado
+            </label>
+          </div>
+          <button
+            type="submit"
+            :disabled="guardando"
+            class="mt-2 bg-primary-container text-white font-ui font-semibold py-3 rounded-xl disabled:opacity-50"
+          >
+            {{ guardando ? "Guardando..." : "Guardar" }}
+          </button>
+        </form>
+      </div>
+    </div>
   </div>
 </template>

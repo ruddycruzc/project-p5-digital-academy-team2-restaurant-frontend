@@ -258,7 +258,7 @@ onBeforeUnmount(() => {
               <button
                 type="button"
                 @click="showOrderDetailModal = true"
-                class="flex-2 flex items-center justify-center gap-2 rounded-full bg-primary text-surface-container-lowest font-ui text-sm font-semibold uppercase py-2"
+                class="flex-2 flex items-center justify-center gap-2 rounded-full bg-primary text-surface-container-lowest font-ui text-sm font-semibold uppercase py-2 cursor-pointer transition-all duration-200 hover:bg-highlight-hover active:scale-[0.98]"
               >
                 <Eye class="w-4 h-4" aria-hidden="true" />
                 Ver Pedido
@@ -268,7 +268,7 @@ onBeforeUnmount(() => {
                 type="button"
                 @click="handleDeliver"
                 :disabled="loading"
-                class="flex-1 flex items-center justify-center gap-2 rounded-full bg-primary-container text-on-primary-container font-ui text-sm font-semibold uppercase py-2 disabled:opacity-50"
+                class="flex-1 flex items-center justify-center gap-2 rounded-full bg-primary-container text-on-primary-container font-ui text-sm font-semibold uppercase py-2 cursor-pointer transition-all duration-200 hover:bg-highlight-hover active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <CheckCircle class="w-4 h-4" aria-hidden="true" />
 
@@ -277,9 +277,6 @@ onBeforeUnmount(() => {
             </div>
           </template>
 
-          <p v-else class="font-body text-sm text-outline">
-            No tienes ningún servicio en curso ahora mismo.
-          </p>
         </section>
 
         <section
@@ -339,7 +336,7 @@ onBeforeUnmount(() => {
               type="button"
               @click="showNewOrderModal = true"
               :disabled="loading"
-              class="mt-1 flex items-center justify-center gap-2 rounded-lg bg-[#ddd7c7] border border-outline-variant/40 text-on-surface font-ui text-sm font-semibold uppercase py-2.5 disabled:opacity-50"
+              class="mt-1 flex items-center justify-center gap-2 rounded-lg bg-surface-container-low border border-outline-variant/40 text-on-surface font-ui text-sm font-semibold uppercase py-2.5 cursor-pointer transition-all duration-200 hover:bg-surface-container-high active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Handshake class="w-4 h-4 text-primary" aria-hidden="true" />
 

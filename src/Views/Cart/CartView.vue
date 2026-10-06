@@ -74,7 +74,7 @@ const handleContinue = async () => {
 
 <template>
   <main
-    class="min-h-screen bg-[var(--color-surface)] px-4 py-10 sm:px-6 lg:px-8"
+    class="min-h-screen flex bg-outline-variant/50 px-4 py-10 sm:px-6 lg:px-8"
   >
     <section class="mx-auto w-full max-w-7xl">
       <!-- Cabecera -->

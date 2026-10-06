@@ -1,26 +1,40 @@
 <script setup>
-import { ref } from "vue";
+import { onMounted, computed } from "vue";
 import { useRouter } from "vue-router";
+import { useAuth } from "@/composables/useAuth";
 import {
   ShieldCheck,
   MapPin,
   Utensils,
-  Calendar,
   ArrowRight,
   LogOut,
   Lock,
 } from "lucide-vue-next";
 
 const router = useRouter();
+const { user, loading, loadUser, logout: authLogout } = useAuth();
 
-const admin = ref({
-  name: "Admin User",
-  email: "admin@giaComo.com",
-  avatar: "https://i.pravatar.cc/150?img=47",
-  role: "Administrador",
-  establishment: "Goxu",
-  status: "Activo",
-  lastAccess: "03/09/2026",
+onMounted(() => {
+  if (!user.value) {
+    loadUser();
+  }
+});
+
+const initials = computed(() => {
+  if (!user.value?.name) return "A";
+  return user.value.name
+    .split(" ")
+    .map((n) => n[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+});
+
+const roleLabel = computed(() => {
+  if (!user.value?.roles?.length) return "Administrador";
+  return user.value.roles.includes("ADMIN")
+    ? "Administrador"
+    : user.value.roles[0];
 });
 
 function goToPanel() {
@@ -28,6 +42,7 @@ function goToPanel() {
 }
 
 function logout() {
+  authLogout();
   router.push({ name: "login" });
 }
 </script>
@@ -49,16 +64,23 @@ function logout() {
       Has iniciado sesión correctamente. Estos son tus datos de administrador.
     </p>
 
+    <p v-if="loading && !user" class="font-ui text-sm text-outline mt-6">
+      Cargando datos del administrador...
+    </p>
+
     <div
+      v-else
       class="mt-10 w-full max-w-xl bg-surface-container-lowest rounded-2xl shadow-lg p-6 md:p-10"
     >
       <div class="flex flex-col items-center">
         <div class="relative">
-          <img
-            :src="admin.avatar"
-            alt=""
-            class="w-24 h-24 rounded-full object-cover"
-          />
+          <div
+            class="w-24 h-24 rounded-full bg-primary-container flex items-center justify-center"
+          >
+            <span class="font-headline text-3xl text-white">{{
+              initials
+            }}</span>
+          </div>
           <span
             class="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-primary-container border-2 border-surface-container-lowest flex items-center justify-center"
           >
@@ -66,9 +88,9 @@ function logout() {
           </span>
         </div>
         <h2 class="font-ui text-2xl font-bold text-on-surface mt-4">
-          {{ admin.name }}
+          {{ user?.name || "Administrador" }}
         </h2>
-        <p class="font-body text-outline">{{ admin.email }}</p>
+        <p class="font-body text-outline">{{ user?.email || "" }}</p>
       </div>
 
       <hr class="border-surface-container-low my-6" />
@@ -84,7 +106,7 @@ function logout() {
             class="flex items-center gap-2 font-ui font-semibold text-on-surface"
           >
             <MapPin class="w-4 h-4 text-highlight" />
-            {{ admin.role }}
+            {{ roleLabel }}
           </p>
         </div>
         <div class="bg-surface-container-low rounded-lg p-4">
@@ -97,32 +119,7 @@ function logout() {
             class="flex items-center gap-2 font-ui font-semibold text-on-surface"
           >
             <Utensils class="w-4 h-4 text-highlight" />
-            {{ admin.establishment }}
-          </p>
-        </div>
-        <div class="bg-surface-container-low rounded-lg p-4">
-          <p
-            class="font-ui text-label-caps tracking-caps uppercase text-outline mb-1"
-          >
-            Estado
-          </p>
-          <span
-            class="inline-block bg-highlight/20 text-highlight font-ui font-semibold px-3 py-1 rounded-full text-sm"
-          >
-            ● {{ admin.status }}
-          </span>
-        </div>
-        <div class="bg-surface-container-low rounded-lg p-4">
-          <p
-            class="font-ui text-label-caps tracking-caps uppercase text-outline mb-1"
-          >
-            Último acceso
-          </p>
-          <p
-            class="flex items-center gap-2 font-ui font-semibold text-on-surface"
-          >
-            <Calendar class="w-4 h-4 text-highlight" />
-            {{ admin.lastAccess }}
+            Goxu
           </p>
         </div>
       </div>
@@ -131,7 +128,7 @@ function logout() {
 
       <div class="text-center">
         <h3 class="font-ui font-bold text-lg text-on-surface">
-          Todo listo para gestionar {{ admin.establishment }}.
+          Todo listo para gestionar Goxu.
         </h3>
         <p class="font-body text-outline mt-2">
           Accede al panel para administrar productos, pedidos, facturación e
@@ -160,7 +157,7 @@ function logout() {
       class="flex items-center justify-center gap-1.5 font-body text-outline text-sm mt-6"
     >
       <Lock class="w-3.5 h-3.5" />
-      Conexión cifrada de administración {{ admin.establishment }}
+      Conexión cifrada de administración Goxu
     </p>
   </div>
 </template>

@@ -117,6 +117,7 @@ const routes = [
     path: "/admin/welcome",
     name: "admin-welcome",
     component: AdminWelcomeView,
+    meta: { roles: ["ADMIN"] },
   },
   {
     path: "/admin",

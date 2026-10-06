@@ -133,7 +133,7 @@ async function advanceStatus(order, nextStatus) {
 </script>
 
 <template>
-  <div class="min-h-screen bg-surface-container">
+  <div class="min-h-screen bg-outline-variant/50">
     <header
       class="relative bg-on-surface text-surface-container-lowest px-4 md:px-6 py-4 flex items-center justify-between"
     >
@@ -150,7 +150,7 @@ async function advanceStatus(order, nextStatus) {
       </div>
       <button
         @click="handleLogout"
-        class="group mt-4 flex items-center gap-2 font-ui text-sm font-semibold text-highlight transition-colors duration-200 hover:text-highlight/80"
+        class="group mt-4 flex items-center gap-2 font-ui text-sm font-semibold text-highlight transition-colors duration-200 hover:text-highlight/80 cursor-pointer"
       >
         <LogOut
           class="w-4 h-4 transition-transform duration-200 group-hover:translate-x-0.5"
@@ -159,7 +159,7 @@ async function advanceStatus(order, nextStatus) {
       </button>
     </header>
 
-    <main class="p-4 md:p-6">
+    <main class="px-4 py-6 md:px-6 md:py-8">
       <h1 class="sr-only">Dashboard de Cocina</h1>
 
       <div
@@ -169,7 +169,7 @@ async function advanceStatus(order, nextStatus) {
           v-for="col in columns"
           :key="col.key"
           :aria-labelledby="`col-title-${col.key}`"
-          class="shrink-0 w-[85vw] max-w-sm snap-start md:w-auto md:max-w-none bg-surface-container-lowest rounded-xl p-4"
+          class="shrink-0 w-[85vw] max-w-sm snap-start md:w-auto md:max-w-none bg-surface-container-lowest rounded-2xl p-4 border border-outline-variant/30 shadow-sm"
         >
           <div class="flex items-center justify-between mb-4">
             <h2
@@ -191,8 +191,7 @@ async function advanceStatus(order, nextStatus) {
             <div
               v-for="order in ordersByColumn[col.key]"
               :key="order.id"
-              class="bg-surface-container rounded-lg p-4 flex flex-col gap-3"
-              :class="col.key === 'listos' ? 'opacity-50' : ''"
+              class="bg-surface-container rounded-xl p-4 flex flex-col gap-3 border border-outline-variant/30 shadow-sm"
             >
               <div class="flex items-center justify-between">
                 <h3
@@ -227,10 +226,21 @@ async function advanceStatus(order, nextStatus) {
               </div>
 
               <template v-if="col.key === 'listos'">
-                <p class="font-body text-sm text-outline">Pedido preparado</p>
+                <div class="flex items-center gap-2">
+                  <span
+                    class="flex items-center justify-center w-5 h-5 rounded-full bg-outline-variant text-on-surface"
+                    aria-hidden="true"
+                  >
+                    ✓
+                  </span>
+
+                  <p class="font-body text-sm font-semibold text-on-surface">
+                    Pedido preparado
+                  </p>
+                </div>
 
                 <p class="font-body text-xs text-outline">
-                  Listo para continuar con el siguiente paso
+                  Listo para la entrega
                 </p>
               </template>
 
@@ -282,7 +292,7 @@ async function advanceStatus(order, nextStatus) {
                   v-if="col.key === 'nuevos'"
                   type="button"
                   @click="advanceStatus(order, 'IN_KITCHEN')"
-                  class="w-full rounded bg-primary text-on-primary font-ui text-sm font-semibold uppercase py-2"
+                  class="w-full rounded-lg bg-primary text-on-primary font-ui text-sm font-semibold uppercase py-2.5 transition-all duration-200 hover:bg-highlight-hover active:scale-[0.98] cursor-pointer"
                 >
                   Empezar
                 </button>
@@ -291,7 +301,7 @@ async function advanceStatus(order, nextStatus) {
                   v-if="col.key === 'en-curso'"
                   type="button"
                   @click="advanceStatus(order, 'READY')"
-                  class="w-full rounded bg-primary text-on-primary font-ui text-sm font-semibold uppercase py-2"
+                  class="w-full rounded-lg bg-primary text-on-primary font-ui text-sm font-semibold uppercase py-2.5 transition-all duration-200 hover:bg-highlight-hover active:scale-[0.98] cursor-pointer"
                 >
                   Listo
                 </button>
